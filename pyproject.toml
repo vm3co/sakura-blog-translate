@@ -1,0 +1,27 @@
+[project]
+name = "sakura-blog-translate"
+version = "1.0.0"
+description = "櫻坂blog翻譯程式"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "beautifulsoup4",
+    "requests",
+    "deepl",
+    "google-generativeai",
+]
+
+[project.optional-dependencies]
+windows = [
+    "pywin32>=306",
+]
+build = [
+    "pyinstaller>=6.0.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pyinstaller>=6.0.0",
+]
