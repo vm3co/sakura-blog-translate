@@ -1,4 +1,5 @@
 # main.py
+import asyncio
 from urllib.parse import urlparse, urljoin
 import os
 from dotenv import load_dotenv
@@ -86,8 +87,13 @@ async def get_original_article(
             # 重建官網的 URL
             original_article_url = f"{BASE_URL}/s/s46/diary/detail/{article_id}?ima=0000&cd=blog"
             
-            # 呼叫主函式 (回傳字串)
-            trans_html_string = japan_translator.translate_webpage(original_article_url, article_id, model="gemini")
+            # 呼叫主函式 (回傳字串)，使用 asyncio.to_thread 避免阻塞事件迴圈
+            trans_html_string = await asyncio.to_thread(
+                japan_translator.translate_webpage,
+                original_article_url,
+                article_id,
+                model="gemini"
+            )
 
             if trans_html_string is None:
                 raise HTTPException(status_code=503, detail="翻譯失敗，請稍後再試。")
