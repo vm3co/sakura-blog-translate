@@ -11,6 +11,9 @@ dependencies = [
     "requests",
     "deepl",
     "google-generativeai",
+    "google-cloud-storage",
+    "google-cloud-firestore",
+    "google-cloud-logging",
 ]
 
 [project.optional-dependencies]

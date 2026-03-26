@@ -14,10 +14,9 @@ import logging
 import sqlite3
 from datetime import datetime
 
-# from google import genai
-# from google.genai import types
 import google.generativeai as genai
 from google.generativeai import types
+import gcp_utils
 
 import html_processor
 
@@ -26,43 +25,6 @@ load_dotenv()
 
 # --- 設定常數 ---
 ARTICLES_DIR = os.path.join("templates", "translated_articles")
-DB_PATH = "translate_log.db"
-
-def init_db():
-    """
-    初始化 SQLite 資料庫，若資料表不存在則建立。
-    """
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS translation_log (
-                id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp     TEXT    NOT NULL,
-                url           TEXT    NOT NULL,
-                status        TEXT    NOT NULL,
-                original_html TEXT,
-                translated_html TEXT,
-                error_msg     TEXT
-            )
-        """)
-        conn.commit()
-
-def save_translation_log(url, status, original_html, translated_html, error_msg=None):
-    """
-    將一筆翻譯紀錄寫入資料庫。
-    """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            """
-            INSERT INTO translation_log
-                (timestamp, url, status, original_html, translated_html, error_msg)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (timestamp, url, status, original_html, translated_html, error_msg)
-        )
-        conn.commit()
-
-init_db()
 
 # 獲取一個 logger 實例
 logger = logging.getLogger(__name__)
@@ -159,7 +121,7 @@ def get_translation_gemini(html_to_translate):
         logger.error(f"Gemini API 呼叫失敗: {e}")
         return None
 
-def translate_webpage(url_to_scrape, output_file="translated_page.html", model="gemini"):
+def translate_webpage(url_to_scrape, article_id, model="gemini"):
     """
     主程式：抓取、翻譯並儲存網頁
     """
@@ -201,20 +163,19 @@ def translate_webpage(url_to_scrape, output_file="translated_page.html", model="
                 status = "fail"
                 error_msg = str(e)
             finally:
-                save_translation_log(
-                    url_to_scrape, status,
-                    html_to_translate, translated_html_string,
+                gcp_utils.save_translation_log_to_firestore(
+                    article_id,
+                    url_to_scrape,
+                    status,
+                    html_to_translate, 
+                    translated_html_string,
                     error_msg
                 )
         count += 1
         logger.info(f"已翻譯 {count} / {len(tags_to_translate)} 個區塊...")
             
-    # 4. 儲存結果
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(str(new_soup))
-        
-    logger.info(f"翻譯完成！結果已儲存至: {output_file}")
-    return output_file
+    logger.info(f"翻譯完成！")
+    return str(new_soup)
 
 if __name__ == "__main__":
     # 範例：翻譯一個日本網站

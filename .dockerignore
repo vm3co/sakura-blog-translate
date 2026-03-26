@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+.env
+app_log.log
+translate.txt
+translate_log.db
+templates/translated_articles/

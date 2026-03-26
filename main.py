@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 from typing import Optional
 from fastapi.responses import HTMLResponse, FileResponse
 import uvicorn
+import gcp_utils
 
 import japan_translator 
 import constants
@@ -21,13 +22,13 @@ parsed_url = urlparse(BLOG_LIST_URL)
 BASE_URL = f"{parsed_url.scheme}://{parsed_url.netloc}"
 ARTICLES_DIR = os.path.join("templates", "translated_articles")
 
-# 配置日誌
+# 配置日誌 (主要利用 gcp_utils 導向 Cloud Logging)
+gcp_utils.setup_gcp_logging()
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(), # 輸出到控制台
-        logging.FileHandler(constants.LOG_FILE_PATH, encoding='utf-8') # 輸出到檔案
+        logging.StreamHandler(), # 輸出到控制台給 Cloud Run 擷取
     ]
 )
 
@@ -72,8 +73,10 @@ async def get_original_article(
     file_path = os.path.join(ARTICLES_DIR, f"{article_id}.html")
     
     # --- 1. 檢查快取 (Cache Hit) ---
-    if os.path.exists(file_path): # 檢查檔案是否存在
+    cached_html = gcp_utils.get_cached_html_from_gcs(article_id)
+    if cached_html:
         logger.info(f"【快取命中】: {article_id}.html (正在回傳已儲存檔案)")
+        return HTMLResponse(content=cached_html)
     else:
         # --- 2. 快取未命中 (Cache Miss) ---
         logger.info(f"【快取未命中】: {article_id}.html (正在觸發即時翻譯)")
@@ -83,16 +86,19 @@ async def get_original_article(
             # 重建官網的 URL
             original_article_url = f"{BASE_URL}/s/s46/diary/detail/{article_id}?ima=0000&cd=blog"
             
-            # 呼叫主函式
-            trans = japan_translator.translate_webpage(original_article_url, output_file=file_path)
+            # 呼叫主函式 (回傳字串)
+            trans_html_string = japan_translator.translate_webpage(original_article_url, article_id, model="gemini")
 
-            if trans is None:
+            if trans_html_string is None:
                 raise HTTPException(status_code=503, detail="翻譯失敗，請稍後再試。")
+            
+            # 儲存到 GCS
+            gcp_utils.upload_html_to_gcs(article_id, trans_html_string)
+            return HTMLResponse(content=trans_html_string)
                
         except Exception as e:
             logger.error(f"翻譯失敗: {e}")
             raise HTTPException(status_code=503, detail=f"翻譯任務失敗: {e}")
-    return FileResponse(file_path)
 
 
 @app.get("/s/s46/diary/blog/list", response_class=HTMLResponse)
