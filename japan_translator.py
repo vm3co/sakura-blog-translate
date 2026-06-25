@@ -37,7 +37,7 @@ deepl_client = deepl.DeepLClient(DEEPL_API_KEY)
 # --- 設定 Gemini Client ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.5-flash')
+model = genai.GenerativeModel('gemini-3.5-flash')
 
 # --- 這是 LLM 的核心：提示 (Prompt) ---
 # SYSTEM_PROMPT = """
